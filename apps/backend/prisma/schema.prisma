@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id           String    @id @default(cuid())
+  shopifyStore String    @unique(map: "shopify_store_unique")
+  accessToken  String
+  storeName    String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  
+  // Relationships
+  customers Customer[]
+  orders    Order[]
+  products  Product[]
+}
+
+model Customer {
+  id              String   @id @default(cuid())
+  shopifyId       String
+  email           String
+  firstName       String?
+  lastName        String?
+  totalSpent      Float    @default(0)
+  ordersCount     Int      @default(0)
+  createdAt       DateTime
+  updatedAt       DateTime
+  
+  // Relationships
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orders          Order[]
+  
+  @@unique([tenantId, shopifyId], name: "tenant_shopify_id")
+  @@index([tenantId])
+  @@index([email])
+}
+
+model Product {
+  id           String   @id @default(cuid())
+  shopifyId    String
+  title        String
+  vendor       String?
+  productType  String?
+  price        Float
+  inventory    Int?
+  createdAt    DateTime
+  
+  // Relationships
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderItems   OrderItem[]
+  
+  @@unique([tenantId, shopifyId], name: "tenant_product_id")
+  @@index([tenantId])
+}
+
+model Order {
+  id           String   @id @default(cuid())
+  shopifyId    String
+  orderNumber  String
+  totalPrice   Float
+  currency     String
+  status       String
+  customerId   String?
+  createdAt    DateTime
+  updatedAt    DateTime
+  
+  // Relationships
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customer     Customer? @relation(fields: [customerId], references: [id])
+  items        OrderItem[]
+  
+  @@unique([tenantId, shopifyId], name: "tenant_order_id")
+  @@index([tenantId])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id         String   @id @default(cuid())
+  quantity   Int
+  price      Float
+  
+  // Relationships
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([orderId, productId], name: "order_product_unique")
+  @@index([orderId])
+}
+
+model WebhookEvent {
+  id         String   @id @default(cuid())
+  topic      String
+  shopDomain String
+  payload    Json
+  processed  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  
+  @@index([shopDomain, topic])
+}
